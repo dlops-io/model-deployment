@@ -7,9 +7,8 @@ verify_ssl = true
 
 [packages]
 google-cloud-aiplatform = "*"
-wandb = "*"
 pillow = "*"
-tensorflow-aarch64 = "*"
+tensorflow = "==2.13.1"
 
 [requires]
 python_version = "3.9"
