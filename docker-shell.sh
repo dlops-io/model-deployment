@@ -6,7 +6,7 @@ export IMAGE_NAME=model-deployment-cli
 export BASE_DIR=$(pwd)
 export SECRETS_DIR=$(pwd)/../secrets/
 export GCP_PROJECT="ac215-project"
-export GCS_MODELS_BUCKET_NAME="mushroom-app-models-demo"
+export GCS_MODELS_BUCKET_NAME="cheese-app-models-demo"
 
 
 # Build the image based on the Dockerfile

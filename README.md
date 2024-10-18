@@ -1,4 +1,4 @@
-# Mushroom App: Model Deployment Demo
+# Cheese App: Model Deployment Demo
 
 In this tutorial we will deploy a model to Vertex AI:
 <img src="images/serverless-model-deployment.png"  width="800">
@@ -6,19 +6,6 @@ In this tutorial we will deploy a model to Vertex AI:
 ## Prerequisites
 * Have Docker installed
 * Cloned this repository to your local machine with a terminal up and running
-* Check that your Docker is running with the following command
-
-`docker run hello-world`
-
-### Install Docker 
-Install `Docker Desktop`
-
-#### Ensure Docker Memory
-- To make sure we can run multiple container go to Docker>Preferences>Resources and in "Memory" make sure you have selected > 4GB
-
-### Install VSCode  
-Follow the [instructions](https://code.visualstudio.com/download) for your operating system.  
-If you already have a preferred text editor, skip this step.  
 
 ## Setup Environments
 In this tutorial we will setup a container to manage building and deploying models to Vertex AI Model Registry and Model Endpoints.
@@ -56,11 +43,11 @@ Your folder structure should look like this:
 We need a bucket to store the saved model files that we will be used by Vertext AI to deploy models.
 
 - Go to `https://console.cloud.google.com/storage/browser`
-- Create a bucket `mushroom-app-models-demo` [REPLACE WITH YOUR BUCKET NAME]
+- Create a bucket `cheese-app-models-demo` [REPLACE WITH YOUR BUCKET NAME]
 
 ## Run Container
 
-### Run `docker-shell.sh` or `docker-shell.bat`
+### Run `docker-shell.sh`
 Based on your OS, run the startup script to make building & running the container easy
 
 This is what your `docker-shell` file will look like:
@@ -69,7 +56,7 @@ export IMAGE_NAME=model-deployment-cli
 export BASE_DIR=$(pwd)
 export SECRETS_DIR=$(pwd)/../secrets/
 export GCP_PROJECT="ac215-project" [REPLACE WITH YOUR PROJECT]
-export GCS_MODELS_BUCKET_NAME="mushroom-app-models-demo" [REPLACE WITH YOUR BUCKET NAME]
+export GCS_MODELS_BUCKET_NAME="cheese-app-models-demo" [REPLACE WITH YOUR BUCKET NAME]
 
 
 # Build the image based on the Dockerfile
@@ -88,12 +75,12 @@ $IMAGE_NAME
 ```
 
 - Make sure you are inside the `model-deployment` folder and open a terminal at this location
-- Run `sh docker-shell.sh` or `docker-shell.bat` for windows
+- Run `sh docker-shell.sh`
 
 ### Prepare Model for Deployment
 We have our model weights stored in WandB after we performed serverless training. In this step we will download the model and upload it to a GCS bucket so Vertex AI can have access to it to deploy to an endpoint.
 
-* Run `python cli.py --upload`, this will download the model weights from WandB and upload to the specified bucket in `GCS_MODELS_BUCKET_NAME`
+* Run `python cli.py --prepare`, this will download the model from our saved location after training, prepare the model and then upload to the specified bucket in `GCS_MODELS_BUCKET_NAME`
 
 ### Upload & Deploy Model to Vertex AI
 In this step we first upload our model to Vertex AI Model registry. Then we deploy the model as an endpoint in Vertex AI Online prediction.
