@@ -93,7 +93,7 @@ In this step we first upload our model to Vertex AI Model registry. Then we depl
 
 * Update the endpoint uri in `cli.py`
 * Run `python cli.py --predict`
-* You  shouls see results simsialr to this:
+* You  should see results similar to this:
 ```
 Predict using endpoint
 image_files: ['data/oyster_3.jpg', 'data/oyster_2.jpg', 'data/oyster_1.jpg', 'data/oyster_4.jpg', 'data/crimini_1.jpg']
