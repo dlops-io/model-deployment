@@ -119,9 +119,16 @@ def prepare():
     # Save updated model to GCS
     tf.saved_model.save(
         prediction_model,
-        ARTIFACT_URI,
+        "ARTIFACT_URI",
         signatures={"serving_default": serving_function},
     )
+    # Save locally for local testing
+    tf.saved_model.save(
+        prediction_model,
+        "saved_model",
+        signatures={"serving_default": serving_function},
+    )
+
 
 
 def deploy():
@@ -156,7 +163,7 @@ def predict():
     # Get the endpoint
     # Endpoint format: endpoint_name="projects/{PROJECT_NUMBER}/locations/us-central1/endpoints/{ENDPOINT_ID}"
     endpoint = aiplatform.Endpoint(
-        "projects/129349313346/locations/us-central1/endpoints/4907675648136314880"
+        "projects/129349313346/locations/us-central1/endpoints/6690889994342498304"
     )
 
     # Get a sample image to predict
@@ -177,10 +184,11 @@ def predict():
 
         print("Result:", result)
         prediction = result.predictions[0]
-        print(prediction, prediction.index(max(prediction)))
+        prediction_index = prediction.index(max(prediction))
+        print(prediction, prediction_index)
         print(
             "Label:   ",
-            data_details["index2label"][prediction.index(max(prediction))],
+            data_details["index2label"][str(prediction_index)],
             "\n",
         )
 
