@@ -119,16 +119,9 @@ def prepare():
     # Save updated model to GCS
     tf.saved_model.save(
         prediction_model,
-        "ARTIFACT_URI",
+        ARTIFACT_URI,
         signatures={"serving_default": serving_function},
     )
-    # Save locally for local testing
-    tf.saved_model.save(
-        prediction_model,
-        "saved_model",
-        signatures={"serving_default": serving_function},
-    )
-
 
 
 def deploy():
