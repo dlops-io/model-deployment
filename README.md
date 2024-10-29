@@ -3,14 +3,10 @@
 In this tutorial we will deploy a model to Vertex AI:
 <img src="images/serverless-model-deployment.png"  width="800">
 
-## Prerequisites
-* Have Docker installed
-* Cloned this repository to your local machine with a terminal up and running
 
 ## Setup Environments
 In this tutorial we will setup a container to manage building and deploying models to Vertex AI Model Registry and Model Endpoints.
 
-**In order to complete this tutorial you will need your GCP account setup and a WandB account setup.**
 
 ### Clone the github repository
 - Clone or download from [here](https://github.com/dlops-io/model-deployment)
@@ -50,35 +46,14 @@ We need a bucket to store the saved model files that we will be used by Vertext 
 ### Run `docker-shell.sh`
 Based on your OS, run the startup script to make building & running the container easy
 
-This is what your `docker-shell` file will look like:
-```
-export IMAGE_NAME=model-deployment-cli
-export BASE_DIR=$(pwd)
-export SECRETS_DIR=$(pwd)/../secrets/
-export GCP_PROJECT="ac215-project" [REPLACE WITH YOUR PROJECT]
-export GCS_MODELS_BUCKET_NAME="cheese-app-models-demo" [REPLACE WITH YOUR BUCKET NAME]
-
-
-# Build the image based on the Dockerfile
-#docker build -t $IMAGE_NAME -f Dockerfile .
-# M1/2 chip macs use this line
-docker build -t $IMAGE_NAME --platform=linux/arm64/v8 -f Dockerfile .
-
-# Run Container
-docker run --rm --name $IMAGE_NAME -ti \
--v "$BASE_DIR":/app \
--v "$SECRETS_DIR":/secrets \
--e GOOGLE_APPLICATION_CREDENTIALS=/secrets/model-deployment.json \
--e GCP_PROJECT=$GCP_PROJECT \
--e GCS_MODELS_BUCKET_NAME=$GCS_MODELS_BUCKET_NAME \
-$IMAGE_NAME
-```
 
 - Make sure you are inside the `model-deployment` folder and open a terminal at this location
 - Run `sh docker-shell.sh`
 
 ### Prepare Model for Deployment
-We have our model weights stored in WandB after we performed serverless training. In this step we will download the model and upload it to a GCS bucket so Vertex AI can have access to it to deploy to an endpoint.
+Our model weights are stored in WandB following the serverless training we did in the previous tutorials. In this step, we’ll download the model and then upload it to a GCS bucket, enabling Vertex AI to access it for deployment to an endpoint.
+
+Since accessing WandB requires permission to Pavlos account, we’ve instead moved the model to GitHub. In cli.py, you’ll see the code for downloading from WandB is commented out to reflect this adjustment.
 
 * Run `python cli.py --prepare`, this will download the model from our saved location after training, prepare the model and then upload to the specified bucket in `GCS_MODELS_BUCKET_NAME`
 
