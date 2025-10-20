@@ -1,11 +1,18 @@
-# Use the official Ubuntu image as the base
-FROM ubuntu:20.04
+# Use the official Python image as the base with Python 3.13
+FROM python:3.11-slim-bullseye
 
-# Set the environment variable for non-interactive installations
+# Prevent apt from showing prompts
 ENV DEBIAN_FRONTEND=noninteractive
+
+# Python wants UTF-8 locale
 ENV LANG=C.UTF-8
-ENV PYENV_SHELL=/bin/bash
+
+# Tell Python to disable buffering so we don't lose any logs.
 ENV PYTHONUNBUFFERED=1
+
+# Tell uv to copy packages from the wheel into the site-packages
+ENV UV_LINK_MODE=copy
+ENV UV_PROJECT_ENVIRONMENT=/.venv
 
 # Install required dependencies
 RUN apt-get update && \
@@ -19,9 +26,9 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
 
 # Docker
 RUN install -m 0755 -d /etc/apt/keyrings
-RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 RUN chmod a+r /etc/apt/keyrings/docker.gpg
-RUN echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+RUN echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
     "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
     tee /etc/apt/sources.list.d/docker.list > /dev/null
 
@@ -29,28 +36,29 @@ RUN echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/d
 RUN apt-get update && \
     apt-get install -y google-cloud-sdk google-cloud-sdk-gke-gcloud-auth-plugin jq docker-ce
 
-# Python
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends python3.9 python3-pip && \
-    pip install pipenv
+# Install UV (Python package installer)
+RUN pip install uv
+ENV PATH="$PATH:/root/.local/bin"
 
+# Create user
 RUN useradd -ms /bin/bash app -d /home/app -u 1000 -p "$(openssl passwd -1 passw0rd)" && \
     usermod -aG docker app && \
     mkdir -p /app && \
-    chown app:app /app
+    chown app:app /app && \
+    mkdir -p /.venv && \
+    chown app:app /.venv
 
-# Switch to the new user
-USER app
+# Set the working directory
 WORKDIR /app
 
-# Install python packages
-ADD --chown=app:app Pipfile Pipfile.lock /app/
+# Copy dependency files first for better layer caching
+COPY --chown=app:app pyproject.toml uv.lock* ./
 
-RUN pipenv sync
+# Install dependencies in a separate layer for better caching
+RUN uv sync --frozen
 
-# Add the rest of the source code. This is done last so we don't invalidate all
-# layers when we change a line of code.
-ADD --chown=app:app . /app
+# Copy the rest of the source code
+COPY --chown=app:app . ./
 
 # Entry point
-ENTRYPOINT ["/bin/bash","./docker-entrypoint.sh"]
+ENTRYPOINT ["/bin/bash","docker-entrypoint.sh"]

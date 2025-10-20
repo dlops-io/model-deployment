@@ -28,12 +28,12 @@ BEST_MODEL = "model-mobilenetv2_train_base_True.v1"
 ARTIFACT_URI = f"gs://{GCS_MODELS_BUCKET_NAME}/{BEST_MODEL}"
 
 data_details = {
-    "image_width": 224, 
-    "image_height": 224, 
-    "num_channels": 3, 
-    "num_classes": 4, 
-    "label2index": {"parmigiano": 0, "gruyere": 1, "brie": 2, "gouda": 3}, 
-    "index2label": {"0": "parmigiano", "1": "gruyere", "2": "brie", "3": "gouda"}
+    "image_width": 224,
+    "image_height": 224,
+    "num_channels": 3,
+    "num_classes": 4,
+    "label2index": {"parmigiano": 0, "gruyere": 1, "brie": 2, "gouda": 3},
+    "index2label": {"0": "parmigiano", "1": "gruyere", "2": "brie", "3": "gouda"},
 }
 
 
@@ -82,11 +82,13 @@ def prepare():
         base_path="artifacts",
         extract=True,
     )
-    prediction_model_path = "./artifacts/mobilenetv2_train_base_True/mobilenetv2_train_base_True.keras"
+    prediction_model_path = (
+        "./artifacts/mobilenetv2_train_base_True/mobilenetv2_train_base_True.keras"
+    )
 
     # Load model
     prediction_model = tf.keras.models.load_model(prediction_model_path)
-    #print(prediction_model.summary())
+    # print(prediction_model.summary())
 
     # Preprocess Image
     def preprocess_image(bytes_input):
@@ -109,11 +111,7 @@ def prepare():
         return results
 
     model_call = tf.function(prediction_model.call).get_concrete_function(
-        [
-            tf.TensorSpec(
-                shape=[None, 224, 224, 3], dtype=tf.float32, name="model_input"
-            )
-        ]
+        [tf.TensorSpec(shape=[None, 224, 224, 3], dtype=tf.float32, name="model_input")]
     )
 
     # Save updated model to GCS
@@ -156,7 +154,7 @@ def predict():
     # Get the endpoint
     # Endpoint format: endpoint_name="projects/{PROJECT_NUMBER}/locations/us-central1/endpoints/{ENDPOINT_ID}"
     endpoint = aiplatform.Endpoint(
-        "projects/129349313346/locations/us-central1/endpoints/6690889994342498304"
+        "projects/129349313346/locations/us-central1/endpoints/6124199502363492352"
     )
 
     # Get a sample image to predict
