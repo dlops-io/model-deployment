@@ -154,7 +154,7 @@ def predict():
     # Get the endpoint
     # Endpoint format: endpoint_name="projects/{PROJECT_NUMBER}/locations/us-central1/endpoints/{ENDPOINT_ID}"
     endpoint = aiplatform.Endpoint(
-        "projects/129349313346/locations/us-central1/endpoints/6124199502363492352"
+        "projects/129349313346/locations/us-central1/endpoints/6971931763471810560"
     )
 
     # Get a sample image to predict
