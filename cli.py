@@ -2,9 +2,9 @@
 Module that contains the command line app.
 
 Typical usage example from command line:
-        python cli.py --upload
-        python cli.py --deploy
-        python cli.py --predict
+        python cli.py --prepare   # download model, add serving function, save to GCS
+        python cli.py --deploy    # upload to Vertex AI Model Registry and deploy to an endpoint
+        python cli.py --predict   # send test images to the endpoint
 """
 
 import os
@@ -202,7 +202,7 @@ def main(args=None):
 if __name__ == "__main__":
     # Generate the inputs arguments parser
     # if you type into the terminal 'python cli.py --help', it will provide the description
-    parser = argparse.ArgumentParser(description="Data Collector CLI")
+    parser = argparse.ArgumentParser(description="Model Deployment CLI")
 
     parser.add_argument(
         "--prepare",

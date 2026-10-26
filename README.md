@@ -124,7 +124,14 @@ The container authenticates with your service account key and drops you into a s
 ```bash
 python cli.py --prepare
 ```
-This downloads the trained model, adds the serving function described above and saves the packaged model to `gs://<your-bucket>/model-mobilenetv2_train_base_True.v1`.
+This does three things:
+
+1. **Download** the trained model from GitHub
+   (`https://github.com/dlops-io/models/releases/download/v3.0/mobilenetv2_train_base_True.zip`)
+   into the container at `/app/artifacts/`, and unzip it. Because `/app` is your `model-deployment` folder mounted into the container, the files also appear on your laptop in `model-deployment/artifacts/` (this folder is in `.gitignore`). The model file is `artifacts/mobilenetv2_train_base_True/mobilenetv2_train_base_True.keras`.
+2. **Package** it for serving: load the `.keras` model and attach the serving function described above, so the model accepts JPEG bytes.
+3. **Upload** the packaged model (TensorFlow SavedModel format) straight to your bucket, at
+   `gs://<your-bucket>/model-mobilenetv2_train_base_True.v1/`. Nothing is written locally in this step; you can check it in the console under Cloud Storage > Buckets.
 
 > The weights were originally tracked in WandB under Pavlos' account. So that everyone can run this, the model is downloaded from GitHub instead; the WandB code is still in `cli.py`, commented out, if you want to pull your own model.
 
@@ -136,7 +143,9 @@ This first uploads the model to the **Model Registry**, then deploys it to a new
 ```
 projects/<PROJECT_NUMBER>/locations/us-central1/endpoints/<ENDPOINT_ID>
 ```
-You can also find it in the console under Agent Platform (Vertex AI) > Online prediction > Endpoints.
+You can check both steps in the console:
+- **Model Registry** (your uploaded model): [https://console.cloud.google.com/vertex-ai/models](https://console.cloud.google.com/vertex-ai/models)
+- **Endpoints** (your deployed endpoint and its ID), also under **Agent Platform > Models > Endpoints**: [https://console.cloud.google.com/vertex-ai/online-prediction/endpoints](https://console.cloud.google.com/vertex-ai/online-prediction/endpoints)
 
 ### Step 4: Predict
 - Open `cli.py` and replace the endpoint name in `predict()` with **your** endpoint.
@@ -154,13 +163,24 @@ The four probabilities are in the order parmigiano, gruyere, brie, gouda.
 
 ### Step 5: Clean up (important)
 A deployed endpoint keeps a machine running and **bills your project every hour**, even when nobody calls it. When you are done:
-- In the console, go to Agent Platform (Vertex AI) > Online prediction > Endpoints, open your endpoint, **undeploy** the model, then **delete** the endpoint.
-- Or from the container:
+**In the console**
+1. Go to **Agent Platform > Models > Endpoints** (Agent Platform was formerly Vertex AI), or open [https://console.cloud.google.com/vertex-ai/online-prediction/endpoints](https://console.cloud.google.com/vertex-ai/online-prediction/endpoints).
+2. Click your endpoint's name. On the row for your model, click **Actions** (⋮) > **Undeploy model from endpoint**, then **Undeploy**.
+3. Back on the Endpoints list, select the endpoint, click **Actions** (⋮) > **Delete endpoint**.
+
+**Or from the container**
 ```bash
+# 1. Find your endpoint ID
 gcloud ai endpoints list --region=us-central1
+
+# 2. Find the deployed model ID (under deployedModels: id)
+gcloud ai endpoints describe <ENDPOINT_ID> --region=us-central1
+
+# 3. Undeploy the model, then delete the endpoint
 gcloud ai endpoints undeploy-model <ENDPOINT_ID> --region=us-central1 --deployed-model-id=<DEPLOYED_MODEL_ID>
 gcloud ai endpoints delete <ENDPOINT_ID> --region=us-central1
 ```
+You must undeploy before you can delete the endpoint (or the model).
 The model in the Model Registry and the files in your bucket do not cost compute, so you can keep them.
 
 ---
