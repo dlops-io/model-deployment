@@ -4,18 +4,14 @@ echo "Container is running!!!"
 echo "Architecture: $(uname -m)"
 
 # Authenticate gcloud using service account
-gcloud auth activate-service-account --key-file $GOOGLE_APPLICATION_CREDENTIALS
+gcloud auth activate-service-account --key-file "$GOOGLE_APPLICATION_CREDENTIALS"
 # Set GCP Project Details
-gcloud config set project $GCP_PROJECT
+gcloud config set project "$GCP_PROJECT"
 
-echo "Environment ready! Virtual environment activated."
-echo "Python version: $(python --version)"
+# The virtual environment (/.venv) is already on PATH (set in the Dockerfile)
+echo "Environment ready!"
+echo "Python: $(which python) ($(python --version))"
 echo "UV version: $(uv --version)"
-
-# Activate virtual environment
-echo "Activating virtual environment..."
-source /.venv/bin/activate
 
 # Keep a shell open
 exec /bin/bash
-

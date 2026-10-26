@@ -116,9 +116,7 @@ From inside the `model-deployment` folder:
 ```bash
 sh docker-shell.sh
 ```
-The container authenticates with your service account key and drops you into a shell with all dependencies installed.
-
-> `docker-shell.sh` builds for Apple-silicon Macs (`--platform=linux/arm64/v8`). On Intel Macs, Windows or Linux, comment out that `docker build` line and uncomment the plain `docker build -t $IMAGE_NAME -f Dockerfile .` line above it.
+The container authenticates with your service account key and drops you into a shell with all dependencies installed. The image is built for your machine's architecture, so the same script works on Apple-silicon and Intel Macs, Windows and Linux.
 
 ### Step 2: Prepare the model
 ```bash
