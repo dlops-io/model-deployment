@@ -2,7 +2,7 @@
 Module that contains the command line app.
 
 Typical usage example from command line:
-        python cli.py --upload
+        python cli.py --prepare
         python cli.py --deploy
         python cli.py --predict
 """
@@ -24,6 +24,7 @@ import tensorflow as tf
 
 GCP_PROJECT = os.environ["GCP_PROJECT"]
 GCS_MODELS_BUCKET_NAME = os.environ["GCS_MODELS_BUCKET_NAME"]
+GCP_REGION = "us-central1"
 BEST_MODEL = "model-mobilenetv2_train_base_True.v1"
 ARTIFACT_URI = f"gs://{GCS_MODELS_BUCKET_NAME}/{BEST_MODEL}"
 
@@ -184,7 +185,9 @@ def predict():
         )
 
 
-def main(args=None):
+def main(args):
+    # Tell the Vertex AI SDK which project and region to use for all calls
+    aiplatform.init(project=GCP_PROJECT, location=GCP_REGION)
 
     if args.prepare:
         print("Prepare model and save model to GCS Bucket")
@@ -202,27 +205,24 @@ def main(args=None):
 if __name__ == "__main__":
     # Generate the inputs arguments parser
     # if you type into the terminal 'python cli.py --help', it will provide the description
-    parser = argparse.ArgumentParser(description="Data Collector CLI")
+    parser = argparse.ArgumentParser(description="Model Deployment CLI")
 
-    parser.add_argument(
+    # Exactly one command must be given
+    command = parser.add_mutually_exclusive_group(required=True)
+    command.add_argument(
         "--prepare",
         action="store_true",
         help="Prepare model and save model to GCS Bucket",
     )
-    parser.add_argument(
+    command.add_argument(
         "--deploy",
         action="store_true",
         help="Deploy saved model to Vertex AI",
     )
-    parser.add_argument(
+    command.add_argument(
         "--predict",
         action="store_true",
         help="Make prediction using the endpoint from Vertex AI",
-    )
-    parser.add_argument(
-        "--test",
-        action="store_true",
-        help="Test deployment to Vertex AI",
     )
 
     args = parser.parse_args()
