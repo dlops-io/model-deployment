@@ -11,11 +11,11 @@ Training a model is only half the job. A model file sitting on a laptop (or in W
 Here is the story, step by step:
 
 1. In the previous tutorials we trained a **MobileNetV2** cheese classifier (brie, gouda, gruyere, parmigiano). We saved the trained weights; for this tutorial they are published as a GitHub release so everyone can download them.
-2. We **prepare** the model for serving: we wrap it with a small function that accepts raw JPEG bytes, decodes and resizes them, and then calls the model. The packaged model is saved to a **GCS bucket**.
+2. We **prepare** the model for serving: we wrap it with a small function that accepts raw JPEG bytes, decodes and resizes them, and then calls the model. The packaged model is saved to a **GCS bucket**, and we test it locally before deploying.
 3. We **upload** the packaged model to the **Vertex AI Model Registry**, telling Vertex which ready-made TensorFlow serving container should run it.
 4. We **deploy** the registered model to a **Vertex AI Endpoint**. Google starts a machine, loads the model, and gives us an endpoint address.
 5. We **predict**: we send cheese images to the endpoint and get back class probabilities.
-6. We **clean up**: we undeploy the model so the endpoint stops costing money.
+6. We **clean up**: we undeploy the model and delete the endpoint so it stops costing money.
 
 The deployment flow is illustrated below:
 <img src="images/serverless-model-deployment.png" width="800">
@@ -58,6 +58,8 @@ A saved model is just files: weights plus the computation graph. To get a predic
 
 ### Why we add a serving function
 Our trained model expects a batch of 224 × 224 × 3 float images. An app, however, has a JPEG file. In `prepare()` we save the model with a **serving signature** that takes JPEG bytes, decodes them, converts them to floats, resizes them to 224 × 224 and only then calls the model. The preprocessing travels with the model, so every client gets exactly the same preprocessing that was used in training.
+
+We save it with Keras' `ExportArchive`, which writes a TensorFlow **SavedModel**: the computation graph, the weights and the serving signature in one folder. That folder is what the model server on Vertex AI loads.
 
 ### Model Registry vs. Endpoint
 - **Model Registry**: a catalog. Uploading a model there records *where its files are* and *which container serves it*. Nothing is running yet and it costs nothing.
@@ -126,40 +128,98 @@ This downloads the trained model, adds the serving function described above and 
 
 > The weights were originally tracked in WandB under Pavlos' account. So that everyone can run this, the model is downloaded from GitHub instead; the WandB code is still in `cli.py`, commented out, if you want to pull your own model.
 
-### Step 3: Upload and deploy
+> **Noisy log lines:** every command that talks to Google Cloud prints lines like
+> ```
+> E0000 00:00:1793029604.310586    1092 alts_credentials.cc:93] ALTS creds ignored. Not running on GCP and untrusted ALTS is not enabled.
+> ```
+> These come from the gRPC library and are harmless (ALTS is an authentication method only used on Google's own machines). You can ignore them.
+
+### Step 3: Test the packaged model locally
+```bash
+python cli.py --test
+```
+This loads the packaged model from your bucket (the same files Vertex AI will load) the same way the TensorFlow model server does, and runs every image in `data/` through its serving function, right here in the container. Deploying takes 10–20 minutes, so this is the quick way to catch a broken model before you wait for a machine. (A model that loads fine with `tf.saved_model.load()` in Python can still fail in the model server, which is why `--test` loads it the server's way.) You should see the class probabilities and label for each image, followed by a line like:
+```
+Correct: 6/8
+```
+This classifier is not perfect, so a couple of wrong labels are expected. A TensorFlow warning that `load` "is deprecated" is also expected: it comes from the server-style loader that `--test` uses on purpose.
+
+### Step 4: Upload and deploy
 ```bash
 python cli.py --deploy
 ```
-This first uploads the model to the **Model Registry**, then deploys it to a new **Endpoint**. It takes several minutes (often 10–20) while Google provisions a machine. When it finishes, the endpoint name is printed, in the form:
-```
-projects/<PROJECT_NUMBER>/locations/us-central1/endpoints/<ENDPOINT_ID>
-```
-You can also find it in the console under Agent Platform (Vertex AI) > Online prediction > Endpoints.
+This does three things:
+1. **Uploads** the model to the **Model Registry**. The first run creates the model `model-mobilenetv2_train_base_True.v1`; every later run adds a new **version** of that same model.
+2. **Finds or creates** an **Endpoint** called `cheese-app-endpoint`. Re-running `--deploy` reuses it, so you never end up paying for several endpoints.
+3. **Deploys** the new model version to the endpoint on one `n1-standard-2` machine and sends it all the traffic. If an older version was deployed there, it is undeployed afterwards so its machine stops billing.
 
-### Step 4: Predict
-- Open `cli.py` and replace the endpoint name in `predict()` with **your** endpoint.
-- Run:
+The deploy step takes several minutes (often 10–20) while Google provisions the machine; the command waits until it is done. It finishes with the endpoint name, in the form:
+```
+Endpoint ready: projects/<PROJECT_NUMBER>/locations/us-central1/endpoints/<ENDPOINT_ID>
+```
+You can also find it in the console under Agent Platform (Vertex AI) > Online prediction > Endpoints, and the model versions under Model Registry.
+
+> **Which serving container?** Vertex AI only runs the prebuilt containers on its [supported list](https://docs.cloud.google.com/gemini-enterprise-agent-platform/machine-learning/predictions/pre-built-containers). The newest TensorFlow one there is `tf2-cpu.2-15`, so that is what `deploy()` uses, even though we save the model with TensorFlow 2.17. This works because the server only needs the saved graph and weights, not Keras or the Python code. If `--deploy` ever fails with `does not have access to this container`, the image is no longer on the list: pick a current one from the list and update `serving_container_image_uri` in `cli.py`.
+
+### Step 5: Predict
 ```bash
 python cli.py --predict
 ```
-It sends five random images from `data/` to the endpoint. For each one you should see the class probabilities and the predicted label, similar to this (your numbers will differ):
+This finds the `cheese-app-endpoint` endpoint and sends all the images in `data/` to it in a single request. For each image you should see the class probabilities, the predicted index and the label:
 ```
-Image: data/brie-1.jpg
-[0.0213, 0.0402, 0.9301, 0.0084] 2
+Endpoint: projects/<PROJECT_NUMBER>/locations/us-central1/endpoints/<ENDPOINT_ID>
+...
+Image: data/brie-2.jpg
+[0.0591, 0.1099, 0.6348, 0.1962] 2
 Label:    brie
+...
+Correct: 6/8
 ```
-The four probabilities are in the order parmigiano, gruyere, brie, gouda.
+The four probabilities are in the order parmigiano, gruyere, brie, gouda. They should match the output of `--test`: the endpoint runs the same model and serving function, just on a Google machine.
 
-### Step 5: Clean up (important)
-A deployed endpoint keeps a machine running and **bills your project every hour**, even when nobody calls it. When you are done:
-- In the console, go to Agent Platform (Vertex AI) > Online prediction > Endpoints, open your endpoint, **undeploy** the model, then **delete** the endpoint.
-- Or from the container:
+Each image in the request looks like this:
+```json
+{"bytes_inputs": {"b64": "<base64-encoded JPEG>"}}
+```
+- `bytes_inputs` is the name of the serving function's argument in `prepare()`, so the model server knows which input this is.
+- JSON cannot carry raw bytes, so the image is base64-encoded. The `{"b64": ...}` wrapper tells the TensorFlow model server to decode it back to bytes before calling the serving function.
+
+To call a different endpoint, pass its ID or full name: `python cli.py --predict --endpoint <ENDPOINT_ID>`.
+
+#### Calling the endpoint without Python
+The endpoint is a plain HTTPS API, so any app can call it. From the container shell, this sends one image with `curl`:
 ```bash
-gcloud ai endpoints list --region=us-central1
+ENDPOINT_ID=$(gcloud ai endpoints list --region=us-central1 --filter=displayName=cheese-app-endpoint --format="value(name.basename())")
+echo "{\"instances\": [{\"bytes_inputs\": {\"b64\": \"$(base64 -w0 data/brie-2.jpg)\"}}]}" > /tmp/request.json
+curl -X POST \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  -d @/tmp/request.json \
+  "https://us-central1-aiplatform.googleapis.com/v1/projects/$GCP_PROJECT/locations/us-central1/endpoints/$ENDPOINT_ID:predict"
+```
+The response is JSON with one list of four probabilities per image, in the same order as above:
+```json
+{"predictions": [[0.0591, 0.1099, 0.6348, 0.1962]], "deployedModelId": "...", ...}
+```
+The `Authorization` header is what "the right credentials" means: the caller needs a Google access token for an account allowed to use the endpoint.
+
+### Step 6: Clean up (important)
+A deployed endpoint keeps a machine running and **bills your project every hour**, even when nobody calls it. When you are done:
+```bash
+python cli.py --cleanup
+```
+This undeploys the model from `cheese-app-endpoint` (which stops the machine) and then deletes the endpoint. It takes a few minutes. Afterwards, `python cli.py --predict` should report that no endpoint was found.
+
+You can also do it by hand:
+- In the console, go to Agent Platform (Vertex AI) > Online prediction > Endpoints, open your endpoint, **undeploy** the model, then **delete** the endpoint.
+- Or with gcloud from the container:
+```bash
+gcloud ai endpoints list --region=us-central1                       # find the ENDPOINT_ID
+gcloud ai endpoints describe <ENDPOINT_ID> --region=us-central1     # find the DEPLOYED_MODEL_ID (deployedModels > id)
 gcloud ai endpoints undeploy-model <ENDPOINT_ID> --region=us-central1 --deployed-model-id=<DEPLOYED_MODEL_ID>
 gcloud ai endpoints delete <ENDPOINT_ID> --region=us-central1
 ```
-The model in the Model Registry and the files in your bucket do not cost compute, so you can keep them.
+The model versions in the Model Registry cost nothing, and the files in your bucket cost only a few cents a month for storage, so you can keep them. Running `--deploy` again later creates a new endpoint.
 
 ---
 
@@ -168,10 +228,12 @@ The model in the Model Registry and the files in your bucket do not cost compute
 ```bash
 sh docker-shell.sh            # start the container
 python cli.py --prepare       # package the model and save it to GCS
+python cli.py --test          # check the packaged model locally
 python cli.py --deploy        # upload to Model Registry and deploy to an Endpoint
-python cli.py --predict       # send test images to the Endpoint (set your endpoint in cli.py first)
+python cli.py --predict       # send the sample images to the Endpoint
+python cli.py --cleanup       # undeploy the model and delete the Endpoint (stops billing)
 ```
-Then **undeploy and delete the endpoint** when you are done.
+Always run `--cleanup` when you are done, so the endpoint stops billing.
 
 ---
 
@@ -184,5 +246,6 @@ Then **undeploy and delete the endpoint** when you are done.
 
 ### Learn more
 - [Deploy a model to an endpoint](https://docs.cloud.google.com/gemini-enterprise-agent-platform/machine-learning/general/deployment)
-- [Prebuilt containers for prediction](https://cloud.google.com/vertex-ai/docs/predictions/pre-built-containers)
+- [Prebuilt containers for prediction](https://docs.cloud.google.com/gemini-enterprise-agent-platform/machine-learning/predictions/pre-built-containers)
+- [Keras `ExportArchive`](https://keras.io/api/models/model_saving_apis/export/)
 - [Model Registry](https://docs.cloud.google.com/gemini-enterprise-agent-platform/machine-learning/model-registry/versioning)

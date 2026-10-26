@@ -4,3 +4,4 @@
 trainer.tar.gz
 /artifacts
 /wandb
+__pycache__/
