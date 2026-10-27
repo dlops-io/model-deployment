@@ -300,6 +300,7 @@ if __name__ == "__main__":
     # Generate the inputs arguments parser
     # if you type into the terminal 'python cli.py --help', it will provide the description
     parser = argparse.ArgumentParser(description="Model Deployment CLI")
+    parser = argparse.ArgumentParser(description="Model Deployment CLI")
 
     # Exactly one command must be given
     command = parser.add_mutually_exclusive_group(required=True)
